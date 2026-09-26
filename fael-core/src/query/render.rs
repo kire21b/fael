@@ -69,6 +69,8 @@ fn render_inner(log: &Log, rows: &[&Row], budget: usize, full: bool, cut: Option
     let mut out = String::new();
     let mut used = 0;
     let mut cut_budget = false;
+    // a shown title that hides part of its body — the agent is told how to read it
+    let mut hidden = false;
     for (i, r) in rows.iter().enumerate() {
         let id = r.id.get(..width).unwrap_or(&r.id);
         let mark = if closed.contains(r.id.as_str()) {
@@ -115,6 +117,7 @@ fn render_inner(log: &Log, rows: &[&Row], budget: usize, full: bool, cut: Option
             }
             break;
         }
+        hidden |= !full && text != r.text.split_whitespace().collect::<Vec<_>>().join(" ");
         out.push_str(&line);
     }
     // a `--limit` page ends before the matches do — same line shape, no budget involved
@@ -123,6 +126,11 @@ fn render_inner(log: &Log, rows: &[&Row], budget: usize, full: bool, cut: Option
         if rest > 0 {
             out.push_str(&cut_line(rest, (c.next)(c.offset + rows.len())));
         }
+    }
+    if hidden {
+        out.push_str(
+            "bodies: fael find <id> (MCP: find id=<id>) · every body: --full (MCP: full=true)\n",
+        );
     }
     out
 }
