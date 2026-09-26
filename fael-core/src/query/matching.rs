@@ -1,8 +1,26 @@
 use crate::anchor;
 
 /// Exact or under the directory (a zone) — an anchor's ref is opaque, never a zone.
+/// Either side can be the zone: a row filed on `web/` or `web/**` covers `web/src/x.ts`.
 pub(super) fn zone(q: &str, f: &str) -> bool {
-    f == q || (anchor(q).is_none() && f.starts_with(q) && f.as_bytes().get(q.len()) == Some(&b'/'))
+    f == q || under(f, q) || covers(f, q)
+}
+
+/// `f` sits under directory `q` — never through an anchor, whose `/` is not a dir.
+fn under(f: &str, q: &str) -> bool {
+    anchor(q).is_none() && f.starts_with(q) && f.as_bytes().get(q.len()) == Some(&b'/')
+}
+
+/// The row's own file is a directory or a glob that takes in query `q` —
+/// the scope for an area whose files do not exist yet.
+fn covers(f: &str, q: &str) -> bool {
+    if anchor(f).is_some() || anchor(q).is_some() {
+        return false;
+    }
+    if f.contains(['*', '?', '[']) {
+        return glob(f, q);
+    }
+    under(q, f.trim_end_matches('/'))
 }
 
 /// Same directory: both are paths (never anchors) with equal parent dirs.
@@ -43,8 +61,7 @@ pub(super) fn file_match(q: &str, f: &str) -> bool {
     if q.contains(['*', '?', '[']) {
         return glob(q, f);
     }
-    // an anchor's ref is opaque — `/` in it is not a directory
-    f == q || (anchor(q).is_none() && f.starts_with(q) && f.as_bytes().get(q.len()) == Some(&b'/'))
+    zone(q, f)
 }
 
 /// Redis `KEYS` glob: `*` any run (including `:` and `/`), `?` one char, `[abc]` `[a-z]` `[^a]`, `\x` literal.

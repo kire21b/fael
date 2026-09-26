@@ -164,6 +164,42 @@ fn push_ranks_exact_then_dir_then_key() {
 }
 
 #[test]
+fn push_and_find_hit_rows_filed_on_a_dir_or_glob() {
+    let mut l = log();
+    l.rows
+        .push(row("C0000000000000000000000016", "note", &["web/"], None));
+    l.rows.push(row(
+        "C0000000000000000000000017",
+        "note",
+        &["web/**/*.ts"],
+        None,
+    ));
+    l.rows.push(row(
+        "C0000000000000000000000018",
+        "note",
+        &["doc:web"],
+        None,
+    ));
+    let q = |f: &[&str]| {
+        ids(&push(
+            &l,
+            &f.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            &Aliases::default(),
+        ))
+    };
+    // a file under the row's dir, and one its glob takes in
+    assert_eq!(q(&["web/src/messages/th.ts"]), ["17", "16"]);
+    assert_eq!(q(&["web/src/app.css"]), ["16"]);
+    // a sibling that only shares the prefix is not under it; an anchor is no dir
+    assert!(q(&["webkit/a.ts"]).is_empty());
+    assert!(q(&["doc:web/x"]).is_empty());
+    assert_eq!(
+        ids(&find(&l, &files(&["web/src/messages/th.ts"]))),
+        ["17", "16"]
+    );
+}
+
+#[test]
 fn push_ignores_same_dir_for_markdown() {
     let mut l = log();
     l.rows.push(row(
