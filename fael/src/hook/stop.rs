@@ -59,9 +59,28 @@ pub(crate) fn stop(e: &Event) -> Reply {
     // commits only when the edit hook saw nothing (e.g. edits via a shell) —
     // the one git spawn left on this path
     let commits: Vec<String> = if recorded.is_empty() {
-        git(root, &["log", "--since", &since, "--format=%h %s"])
-            .map(|s| s.lines().map(String::from).collect())
-            .unwrap_or_default()
+        // this branch's own commits only: --no-merges drops the merge of the base,
+        // `--not` drops what came in with it (a squash merge made on the remote
+        // after the session started). ponytail: the base is origin's HEAD/main/
+        // master; a `[x]` keeps each --glob literal, so a missing ref is skipped
+        // instead of failing the log.
+        git(
+            root,
+            &[
+                "log",
+                "--no-merges",
+                "--since",
+                &since,
+                "--format=%h %s",
+                "HEAD",
+                "--not",
+                "--glob=refs/remotes/origin/HEA[D]",
+                "--glob=refs/remotes/origin/mai[n]",
+                "--glob=refs/remotes/origin/maste[r]",
+            ],
+        )
+        .map(|s| s.lines().map(String::from).collect())
+        .unwrap_or_default()
     } else {
         vec![]
     };

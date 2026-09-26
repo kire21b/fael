@@ -42,6 +42,9 @@ pub enum Kind {
     Oversize,
     /// open rows whose files all no longer exist — they never push again
     Gone,
+    /// open rows that still name a file that no longer exists — they push,
+    /// but likely describe the repo as it was
+    PartGone,
 }
 
 #[derive(Debug, Clone)]

@@ -169,3 +169,46 @@ fn stop_fails_open() {
     );
     assert!(ok && out.is_empty(), "{out}");
 }
+
+#[test]
+fn stop_skips_commits_merged_in_from_origin() {
+    let d = repo();
+    let (ok, _, err) = fael(&d, &["add", "note", "seed", "--files", "src/a.rs"], "");
+    assert!(ok, "{err}");
+    let git = |args: &[&str]| {
+        let o = std::process::Command::new("git")
+            .args(args)
+            .current_dir(&d)
+            .output()
+            .unwrap();
+        assert!(o.status.success(), "git {args:?}");
+        String::from_utf8(o.stdout).unwrap().trim().to_string()
+    };
+    let branch = git(&["branch", "--show-current"]);
+    git(&["checkout", "-qb", "base"]);
+    let t = transcript(&d, "t1.jsonl");
+    // a squash merge landing on origin/main after the session started,
+    // then merged into the work branch
+    commit(&d, "someone else's PR (#3)");
+    let base = git(&["rev-parse", "HEAD"]);
+    git(&["update-ref", "refs/remotes/origin/main", &base]);
+    git(&[
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    ]);
+    git(&["checkout", "-q", &branch]);
+    git(&["merge", "-q", "--no-ff", "--no-edit", "base"]);
+    let input = format!(r#"{{"cwd":{},"session":{}}}"#, json(&d), json(&t));
+    let (ok, out, _) = fael(&d, &["hook", "stop"], &input);
+    assert!(ok && !out.contains(r#""block":true"#), "{out}");
+
+    // this branch's own commit still blocks (fresh state, no dedupe)
+    commit(&d, "own work");
+    let s2 = state(&d).join("s2");
+    let (ok, out, _) = fael_at(&s2, &d, &["hook", "stop"], &input);
+    assert!(
+        ok && out.contains(r#""block":true"#) && out.contains("own work"),
+        "{out}"
+    );
+}

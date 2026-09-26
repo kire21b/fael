@@ -76,6 +76,25 @@ fn doctor_fails_without_union_then_fix_repairs() {
         out.contains("note [Gone]: 1 open row(s)") && out.contains("src/deleted.rs"),
         "{out}"
     );
+    // one file left, one gone: still pushes, reported apart, naming only the gone file
+    fael(
+        &d,
+        &[
+            "add",
+            "issue",
+            "half gone",
+            "--files",
+            "src/a.rs,src/removed.rs",
+            "--force",
+        ],
+    );
+    let (_, out, _) = fael(&d, &["doctor"]);
+    assert!(
+        out.contains("note [Gone]: 1 open row(s)")
+            && out.contains("note [PartGone]: 1 open row(s)")
+            && out.contains("→ src/removed.rs"),
+        "{out}"
+    );
 }
 
 #[test]

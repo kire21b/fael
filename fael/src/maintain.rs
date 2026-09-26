@@ -64,6 +64,32 @@ pub fn doctor(a: &Args) -> Result<ExitCode, String> {
             ),
         });
     }
+    // some files gone, some left: the row still pushes, but it likely describes
+    // the repo as it was (a tool swapped out, a config file removed)
+    let part: Vec<String> = core::find(&log, &core::Filter::default())
+        .into_iter()
+        .filter(|row| !core::gone(&r.root, row, &al))
+        .filter_map(|row| {
+            let g = core::gone_files(&r.root, row, &al);
+            let w = core::abbrev(&log);
+            (!g.is_empty())
+                .then(|| format!("{} → {}", &row.id[..w.min(row.id.len())], g.join(", ")))
+        })
+        .collect();
+    if !part.is_empty() {
+        rep.problems.push(core::Problem {
+            kind: core::ProblemKind::PartGone,
+            severity: core::Severity::Info,
+            fixable: false,
+            file: None,
+            detail: format!(
+                "{} open row(s) still name a file that no longer exists — check the text still \
+                 holds, then re-file with `--supersedes` or `fael close` (e.g. {})",
+                part.len(),
+                part[..part.len().min(5)].join("; ")
+            ),
+        });
+    }
     show(&rep, a.has("json"));
     Ok(if rep.errors().count() > 0 {
         ExitCode::FAILURE

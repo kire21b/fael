@@ -56,3 +56,28 @@ fn est_tokens_counts_thai_per_char() {
     assert_eq!(est_tokens("abcdefgh"), 2);
     assert_eq!(est_tokens("ไทย"), 3);
 }
+
+#[test]
+fn render_says_how_to_read_a_cut_body() {
+    let mut l = log();
+    l.rows.push(Row {
+        id: "C0000000000000000000000018".into(),
+        kind: "note".into(),
+        text: "Handoff first. Second sentence the title drops.".into(),
+        files: vec!["src/a.rs".into()],
+        ..Row::default()
+    });
+    let hint = "bodies: fael find <id>";
+    let out = render(&l, &find(&l, &Filter::default()), 10_000);
+    assert!(
+        out.contains("Handoff first. …")
+            && out.ends_with(&format!(
+                "{hint} (MCP: find id=<id>) · every body: --full (MCP: full=true)\n"
+            )),
+        "{out}"
+    );
+    // bodies already shown, or nothing cut: no hint
+    assert!(!render_full(&l, &find(&l, &Filter::default()), 10_000).contains(hint));
+    l.rows.pop();
+    assert!(!render(&l, &find(&l, &Filter::default()), 10_000).contains(hint));
+}
