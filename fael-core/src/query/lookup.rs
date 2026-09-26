@@ -111,17 +111,22 @@ pub fn warnings(row: &Row, log: &Log, cfg: &Config) -> Vec<String> {
             }
         }
     }
+    // a long row is usually several decisions in one: reversing one then
+    // means superseding them all, so the nudge is to split, not to trim
     let t = est_tokens(&row.text);
-    if t > cfg.warn_row_tokens {
+    let chars = row.text.chars().count();
+    if t > cfg.warn_row_tokens || chars > 600 {
         w.push(format!(
-            "warning: text is ~{t} tokens (warn at {}) — every push of this row costs that",
+            "warning: text is ~{t} tokens (warn at {}), {chars} chars — one topic per row: split it, \
+each with --key area:topic, so one can be superseded alone (every push costs the full text)",
             cfg.warn_row_tokens
         ));
     }
     // lists show the title, bodies are pulled by id — a long untitled row
-    // costs its full text on every push
+    // costs its full text on every push. Thai and CJK have no spaces between
+    // words, so chars count too.
     let words = row.text.split_whitespace().count();
-    if words > 60 && row.title.as_deref().is_none_or(|t| t.trim().is_empty()) {
+    if (words > 60 || chars > 400) && row.title.as_deref().is_none_or(|t| t.trim().is_empty()) {
         w.push(format!(
             "warning: text is {words} words with no title — add --title \"<≤15-word headline>\" so lists stay skimmable"
         ));

@@ -82,6 +82,24 @@ fn long_untitled_text_warns_short_or_titled_does_not() {
 }
 
 #[test]
+fn long_row_warns_to_split_and_unspaced_text_needs_a_title() {
+    let l = log();
+    let cfg = Config::default();
+    let mut r = row("D0000000000000000000000017", "decision", &["x"], None);
+    // ~150 tokens of English: under the token budget, over the char cap
+    r.text = "stack pick; ".repeat(55);
+    r.title = Some("headline".into());
+    let w = warnings(&r, &l, &cfg);
+    assert!(w.iter().any(|x| x.contains("one topic per row")), "{w:?}");
+    // Thai: no spaces, so one "word" — chars still ask for a title
+    r.text = "ก".repeat(450);
+    r.title = None;
+    let w = warnings(&r, &l, &cfg);
+    assert!(w.iter().any(|x| x.contains("--title")), "{w:?}");
+    assert!(w.iter().any(|x| x.contains("one topic per row")), "{w:?}");
+}
+
+#[test]
 fn find_text_matches_titles() {
     let mut l = log();
     l.rows.push(titled(
