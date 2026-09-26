@@ -3,9 +3,10 @@
 //! Tool failures come back as `isError` results so the agent reads the fix; only protocol
 //! faults are JSON-RPC errors.
 
-use crate::{aliases, close_row, core, read, repo, write::AddOpts, write::add_row};
+use crate::{Repo, aliases, close_row, core, read, repo, repo_at, write::AddOpts, write::add_row};
 use serde_json::{Value, json};
 use std::io::{BufRead, Write};
+use std::path::{Path, PathBuf};
 
 const VERSION: &str = "2025-06-18";
 
@@ -88,8 +89,33 @@ fn files(a: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The repo a call acts on. The server runs in the session's cwd, so an agent
+/// working in another worktree would write there: `cwd` wins, then the repo
+/// holding the first absolute `files` path, then the server's own cwd.
+fn repo_for(a: &Value) -> Result<Repo, String> {
+    if let Some(d) = s(a, "cwd") {
+        return repo_at(Path::new(&d));
+    }
+    let abs = files(a)
+        .into_iter()
+        .map(PathBuf::from)
+        .find(|p| p.is_absolute());
+    // a file not created yet: its nearest existing ancestor holds the repo
+    if let Some(d) = abs
+        .as_deref()
+        .and_then(|p| p.ancestors().find(|d| d.is_dir()))
+    {
+        let r = repo_at(d)?;
+        // a path outside any git repo must not start a .fael/ where it lands
+        if r.root.join(".git").exists() {
+            return Ok(r);
+        }
+    }
+    repo()
+}
+
 fn find(a: &Value) -> Result<String, String> {
-    let r = repo()?;
+    let r = repo_for(a)?;
     let log = read(&r);
     // `find {"id": ...}` pulls that row's body by exact id or unique prefix —
     // lists show titles, this is how the body is read on demand
@@ -132,7 +158,7 @@ fn find(a: &Value) -> Result<String, String> {
 }
 
 fn add(a: &Value) -> Result<String, String> {
-    let r = repo()?;
+    let r = repo_for(a)?;
     let (row, _, warns) = add_row(
         &r,
         &need(a, "kind")?,
@@ -165,7 +191,7 @@ fn urgent_ask(a: &Value) -> Result<core::Urgent, String> {
 }
 
 fn bump(a: &Value) -> Result<String, String> {
-    let r = repo()?;
+    let r = repo_for(a)?;
     let log = read(&r);
     let urgent = match (
         a["urgent"].as_bool().unwrap_or(false),
@@ -191,7 +217,7 @@ fn bump(a: &Value) -> Result<String, String> {
 }
 
 fn close(a: &Value) -> Result<String, String> {
-    let r = repo()?;
+    let r = repo_for(a)?;
     let (row, _, warns) = close_row(&r, &need(a, "id")?, &need(a, "text")?)?;
     Ok(done(&row.id, warns))
 }
@@ -206,7 +232,10 @@ fn done(id: &str, warns: Vec<String>) -> String {
 fn tools() -> Value {
     let str_ = |d: &str| json!({"type": "string", "description": d});
     let files = |d: &str| json!({"type": "array", "items": {"type": "string"}, "description": d});
-    json!([
+    let cwd = str_(
+        "absolute path of the checkout this call is about — pass it when working in a git worktree other than the session's cwd, or rows land in the wrong one",
+    );
+    let mut t = json!([
         {
             "name": "find",
             "description": "Read this project's memory: decisions, open issues and notes left by earlier sessions and teammates. \
@@ -266,5 +295,9 @@ fn tools() -> Value {
                 "not_urgent": {"type": "boolean", "description": "leave the urgent queue"},
             }},
         },
-    ])
+    ]);
+    for tool in t.as_array_mut().unwrap() {
+        tool["inputSchema"]["properties"]["cwd"] = cwd.clone();
+    }
+    t
 }
