@@ -251,15 +251,19 @@ pub fn find<'a>(log: &'a Log, f: &Filter) -> Vec<&'a Row> {
     ranked(out, None, |_| 0, fresh_ts)
 }
 
-/// Every file the row names is a path that no longer exists under `root`,
+/// The files the row names that are paths no longer existing under `root`,
 /// even through `al` (a rename only *adds* a present path, so a wrong pair
-/// keeps one row too many and never hides one). Anchors never go. A row with
-/// no files is never gone. Such rows never push, so kickoff drops them too.
+/// keeps one row too many and never hides one). Anchors never go.
+pub fn gone_files<'a>(root: &Path, r: &'a Row, al: &Aliases) -> Vec<&'a str> {
+    let gone =
+        |f: &&String| anchor(f).is_none() && al.forward(f).iter().all(|p| !root.join(p).exists());
+    r.files.iter().filter(gone).map(String::as_str).collect()
+}
+
+/// Every file the row names is gone (`gone_files`). A row with no files is
+/// never gone. Such rows never push, so kickoff drops them too.
 pub fn gone(root: &Path, r: &Row, al: &Aliases) -> bool {
-    !r.files.is_empty()
-        && r.files
-            .iter()
-            .all(|f| anchor(f).is_none() && al.forward(f).iter().all(|p| !root.join(p).exists()))
+    !r.files.is_empty() && gone_files(root, r, al).len() == r.files.len()
 }
 
 /// The session brief (kickoff, and `find` with no filter): the unfiltered

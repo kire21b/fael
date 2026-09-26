@@ -15,8 +15,8 @@ pub use lookup::{KeyUse, keys, query, resolve, warnings};
 pub use matching::glob;
 pub use render::{Cut, abbrev, est_tokens, render, render_full, render_full_page, render_page};
 pub use select::{
-    Urgent, UrgentChange, brief, closed, cmp_rows, find, fresh_ts, gone, kickoff, page, push,
-    ranked, resolve_urgent, superseded,
+    Urgent, UrgentChange, brief, closed, cmp_rows, find, fresh_ts, gone, gone_files, kickoff, page,
+    push, ranked, resolve_urgent, superseded,
 };
 
 /// What `find` narrows by. Every field is optional; `files` holds normalised refs.

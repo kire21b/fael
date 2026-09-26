@@ -36,8 +36,8 @@ pub use log::{
 };
 pub use query::{
     Cut, Filter, KeyUse, Urgent, UrgentChange, abbrev, brief, closed, cmp_rows, est_tokens, find,
-    fresh_ts, glob, gone, keys, kickoff, page, push, query, ranked, render, render_full,
-    render_full_page, render_page, resolve, resolve_urgent, superseded, warnings,
+    fresh_ts, glob, gone, gone_files, keys, kickoff, page, push, query, ranked, render,
+    render_full, render_full_page, render_page, resolve, resolve_urgent, superseded, warnings,
 };
 pub use row::{Row, Stamp};
 pub use validate::{normalize_files, valid_key, validate, validate_alias, validate_close};
