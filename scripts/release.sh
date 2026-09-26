@@ -16,9 +16,20 @@ git checkout -q main
 git pull -q --ff-only
 
 # the bump commit itself skips CI (direct push), so the commit under it must already be green
+# — a run still queued or going (a merge made seconds ago) is waited on, not refused
 sha=$(git rev-parse HEAD)
+ci_run=
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  ci_run=$(gh run list --workflow ci.yml --commit "$sha" -L1 --json databaseId --jq '.[0].databaseId // empty')
+  [ -n "$ci_run" ] && break
+  sleep 5
+done
+if [ -n "$ci_run" ]; then
+  echo "release: waiting on CI run $ci_run for $(git rev-parse --short HEAD)"
+  gh run watch "$ci_run" --exit-status >/dev/null || true
+fi
 ci=$(gh run list --workflow ci.yml --commit "$sha" -L1 --json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"')
-[ "$ci" = "completed success" ] || { echo "release: CI on main $(git rev-parse --short HEAD) is '${ci:-not run}' — wait for it to pass" >&2; exit 1; }
+[ "$ci" = "completed success" ] || { echo "release: CI on main $(git rev-parse --short HEAD) is '${ci:-not run}' — fix it first" >&2; exit 1; }
 
 old=$(sed -n 's/^version = "\(.*\)"$/\1/p' fael/Cargo.toml | head -n1)
 IFS=. read -r major minor patch <<V
